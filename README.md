@@ -60,19 +60,19 @@ The data used by this program is contain in the .db file, you can refuse to stor
 No data is sent on an external source, everything is on your computer in the program folder per default.
 
 ## Troubleshoot
-Error "database is locked"
+- Error "database is locked"
 	This happen when a connection to the db file is already openned
 	
-Error code -1021 "Timestamp for this request was 1000ms ahead of the server's time."
+- Error code -1021 "Timestamp for this request was 1000ms ahead of the server's time."
 	Your system clock might be (at least slightly) off, try resync the system clock of your computer in the Date and time settings.
 	The program will attempt to do it if you set the 'AutoTimeSync' to 'true'.
 
-Error when reading the 'xxxx' option
+- Error when reading the 'xxxx' option
 	If you build the source code, visual studio encode the config file with a Byte Of Mark (UTF-8-BOM).
 	Change the encoding to UTF-8 with notepad++ or other text editor.
 	
 ## Donations
 I developped this program on my spare time, if you want to support me you can donate at theses adresses :
-BTC : bc1q3u5m3xq66gu57cf2v25rkr0qwt3v9evtnzuej7
-ETH, USDT(ERC-20) & smart chain : 0x356D763b6924D7DC864c550941B911ca87a98e26
-BNB : bnb1rwgj40gyesrnszwvfgq5kgttet654jynv0ql7r
+- BTC : bc1q3u5m3xq66gu57cf2v25rkr0qwt3v9evtnzuej7
+- ETH, USDT(ERC-20) & smart chain : 0x356D763b6924D7DC864c550941B911ca87a98e26
+- BNB : bnb1rwgj40gyesrnszwvfgq5kgttet654jynv0ql7r
