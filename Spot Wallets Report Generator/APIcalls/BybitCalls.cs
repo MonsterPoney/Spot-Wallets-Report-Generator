@@ -105,9 +105,11 @@ namespace Spot_Wallets_Report_Generator.APIcalls {
                         }
                     } else {
                         Program.WriteLog($"Error BybitCalls.GetWallet(), code {json.ret_code} : {json.ret_msg}");
+                        Program.error = true;
                     }
                 } else {
                     Program.WriteLog($"Error contacting Bybit API, response code : {response.StatusCode}.");
+                    Program.error = true;
                 }
 
             }
@@ -134,6 +136,7 @@ namespace Spot_Wallets_Report_Generator.APIcalls {
                     if (json.ret_code == -100010)
                         return -100010;
                     Program.WriteLog($"Error BybitCalls.GetAveragePrice({symbol}) -> {json.ret_code} : {json.ret_msg}");
+                    Program.error = true;
                 }
             }
             catch (Exception e) {

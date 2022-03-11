@@ -7,6 +7,8 @@ The program use EPPlus for the worksheet generation, more info on it here : [EPP
 If you build the source, change the property 'Copy to Output Directory' of the config.ini to 'Do not copy' after the first build or it will change the encoding everytime.
 Then change the encoding to UTF-8 with notepad++ or other text editor.
 
+After configuration, execute 'Spot Wallets Report Generator.exe' in the Release folder to start the program.
+
 ## Configuration
 
 ### Binance
@@ -43,7 +45,7 @@ Switch 'UseKucoin' to true.
 ### Configuration file
 This file is mainly used for APIs credentials.
 But also :
-- Specify arguments to hide the console during execution.
+- Specify arguments.
 	You can also execute the program with the cmd and specify arguments.
 
 - Choose to store the data in a on-disk database file.
@@ -65,7 +67,7 @@ Error "database is locked"
 	
 Error code -1021 "Timestamp for this request was 1000ms ahead of the server's time."
 	Your system clock might be (at least slightly) off, try resync the system clock of your computer in the Date and time settings.
-	The program will attempt to do it if you set the 'AutoTimeSync' to 'true'.
+	~~The program will attempt to do it if you set the 'AutoTimeSync' to 'true'.~~
 
 Error when reading the 'xxxx' option
 	If you build the source code, visual studio encode the config file with a Byte Of Mark (UTF-8-BOM).

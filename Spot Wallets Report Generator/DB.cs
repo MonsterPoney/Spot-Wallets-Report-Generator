@@ -4,7 +4,7 @@ using System.Data.SQLite;
 
 namespace Spot_Wallets_Report_Generator {
     internal class DB {
-        private static readonly string cnx = $"URI=file:{Program.DbPath}";
+        private static readonly string cnx = $"URI=file:{Program.dbPath}";
 
         /// <summary>
         /// Create db if not exists

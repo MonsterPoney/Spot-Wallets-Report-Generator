@@ -22,12 +22,12 @@ namespace Spot_Wallets_Report_Generator {
     internal class Program {
         public static Logger log;
 
-        public static bool initialInsert = false;
+        public static bool initialInsert = false, error=false;
         public static readonly ConfigFile ini = new ConfigFile($"{Environment.CurrentDirectory}/config.ini");
-        private static string ReportFolder, ReportPrefix, SortBy, ReportExtension;
-        private static float IgnoreUnder;
-        public static string DbPath;
-        private static bool UseDB, UseBTCEvol, UseUSDTEvol, AutoTimeSync;
+        private static string reportFolder, reportPrefix, sortBy, reportExtension;
+        private static float ignoreUnder;
+        public static string dbPath;
+        private static bool useDB, useBTCEvol, useUSDTEvol, openLog=false, openReport=false, autoTimeSync;
         private static List<Balance> dailyDatas;
 
         [DllImport("user32.dll")]
@@ -38,10 +38,10 @@ namespace Spot_Wallets_Report_Generator {
 
         private const int SW_HIDE = 0;
         static void Main(string[] args) {
-            try {
+            try {               
                 log = new Logger("./", "", true);
                 SetConsoleCtrlHandler(new HandlerRoutine(ConsoleCtrlCheck), true);
-
+                
                 // Get arguments
                 try {
                     string Arguments = ini.ReadKey("Options", "Arguments").ToLower();
@@ -54,13 +54,15 @@ namespace Spot_Wallets_Report_Generator {
                             }
                         }
                     }
-
                     // Apply arguments
                     for (int i = 0; i < args.Length; i++) {
                         if (args[i] == "-nc" || args[i] == "--noconsole") {
                             var hwnd = GetConsoleWindow();
                             ShowWindow(hwnd, SW_HIDE);
-                        }
+                        } else if (args[i] == "-ol" || args[i] == "--openlog")
+                            openLog = true;
+                        else if (args[i] == "-or" || args[i] == "--openreport")
+                            openReport = true;
                     }
                 }
                 catch (Exception e) {
@@ -68,28 +70,28 @@ namespace Spot_Wallets_Report_Generator {
                 }
 
                 // Get config
-                ReportFolder = ini.ReadKey("Path", "ReportFolder");
-                ReportPrefix = ini.ReadKey("Path", "ReportPrefix");
-                UseDB = bool.Parse(ini.ReadKey("Options", "UseDatabase"));
-                UseBTCEvol = bool.Parse(ini.ReadKey("Options", "UseBTCEvolution").ToLower());
-                UseUSDTEvol = bool.Parse(ini.ReadKey("Options", "UseUSDTEvolution").ToLower());
-                AutoTimeSync = bool.Parse(ini.ReadKey("Options", "AutoTimeSync").ToLower());
-                DbPath = ini.ReadKey("Options", "DatabasePath");
-                SortBy = ini.ReadKey("Options", "SortBy").ToLower();
-                ReportExtension = ini.ReadKey("Options", "ReportExtension");
-                if (!ReportExtension.StartsWith("."))
-                    ReportExtension = "." + ReportExtension;
-                if (!string.IsNullOrWhiteSpace(ini.ReadKey("Options", "IgnoreUnder")) && !float.TryParse(ini.ReadKey("Options", "IgnoreUnder").Replace('.', ','), out IgnoreUnder))
+                reportFolder = ini.ReadKey("Path", "ReportFolder");
+                reportPrefix = ini.ReadKey("Path", "ReportPrefix");
+                useDB = bool.Parse(ini.ReadKey("Options", "UseDatabase"));
+                useBTCEvol = bool.Parse(ini.ReadKey("Options", "UseBTCEvolution").ToLower());
+                useUSDTEvol = bool.Parse(ini.ReadKey("Options", "UseUSDTEvolution").ToLower());
+                autoTimeSync = bool.Parse(ini.ReadKey("Options", "AutoTimeSync").ToLower());
+                dbPath = ini.ReadKey("Options", "DatabasePath");
+                sortBy = ini.ReadKey("Options", "SortBy").ToLower();
+                reportExtension = ini.ReadKey("Options", "ReportExtension");
+                if (!reportExtension.StartsWith("."))
+                    reportExtension = "." + reportExtension;
+                if (!string.IsNullOrWhiteSpace(ini.ReadKey("Options", "IgnoreUnder")) && !float.TryParse(ini.ReadKey("Options", "IgnoreUnder").Replace('.', ','), out ignoreUnder))
                     WriteLog($"Synthax error with parameter 'IngoreUnder', value: { ini.ReadKey("Options", "IgnoreUnder")}\r\nMake sure to use only digits with an optional decimal separator like '.' or ','\r\n Ignored parameter.");
 
-                if (ReportFolder == null || ReportPrefix == null || (DbPath == null && UseDB == true)) {
+                if (reportFolder == null || reportPrefix == null || (dbPath == null && useDB == true)) {
                     WriteLog("Incomplete configuration file.");
                     if (!args.Contains("-nc") || !args.Contains("--noconsole")) {
                         Console.WriteLine("Press Any key to exit.");
                         Console.ReadKey();
                     }
                     Environment.Exit(1);
-                }
+                }            
             }
 
             // Exception if null for booleans
@@ -103,7 +105,7 @@ namespace Spot_Wallets_Report_Generator {
             }
             try {
                 // If user wants to use the local database
-                if (UseDB)
+                if (useDB)
                     if (DB.VerifDB() == false) {
                         Console.WriteLine("Verification DB false");
                         Console.ReadKey();
@@ -152,8 +154,8 @@ namespace Spot_Wallets_Report_Generator {
                 }
 
 
-                if (IgnoreUnder != 0)
-                    dailyDatas.RemoveAll(d => d.AvgInUSDT < IgnoreUnder);
+                if (ignoreUnder != 0)
+                    dailyDatas.RemoveAll(d => d.AvgInUSDT < ignoreUnder);
 
                 if (dailyDatas.Count == 0) {
                     WriteLog("0 asset recovered, exit.");
@@ -164,7 +166,7 @@ namespace Spot_Wallets_Report_Generator {
                     Environment.Exit(0);
                 }
 
-                if (SortBy == "site") {
+                if (sortBy == "site") {
                     // Sort by site
                     dailyDatas.Sort(delegate (Balance a, Balance b)
                     {
@@ -173,7 +175,7 @@ namespace Spot_Wallets_Report_Generator {
                         else if (b.Site == null) return -1;
                         else return a.Site.CompareTo(b.Site);
                     });
-                } else if (SortBy == "asset") {
+                } else if (sortBy == "asset") {
                     // Sort by asset asc
                     dailyDatas.Sort(delegate (Balance a, Balance b)
                     {
@@ -184,7 +186,7 @@ namespace Spot_Wallets_Report_Generator {
                     });
                 }
 
-                if (UseDB)
+                if (useDB)
                     dailyDatas.ForEach(balance => { DB.InsertAsset(balance); });
 
                 GenerateReport();
@@ -199,8 +201,8 @@ namespace Spot_Wallets_Report_Generator {
             try {
                 WriteLog("Generate report.");
                 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-                bool newFile = File.Exists($"{ReportFolder}{ReportPrefix}_{DateTime.Now:Y}{ReportExtension}") == false;
-                FileInfo file = new FileInfo($"{ReportFolder}{ReportPrefix}_{DateTime.Now:Y}{ReportExtension}");
+                bool newFile = File.Exists($"{reportFolder}{reportPrefix}_{DateTime.Now:Y}{reportExtension}") == false;
+                FileInfo file = new FileInfo($"{reportFolder}{reportPrefix}_{DateTime.Now:Y}{reportExtension}");
                 using (var package = new ExcelPackage(file)) {
 
                     List<ExcelWorksheet> worksheets = package.Workbook.Worksheets.OrderBy(w => w.Name).ToList();
@@ -212,8 +214,8 @@ namespace Spot_Wallets_Report_Generator {
 
                     if (newFile) {
                         // Search for last month excel
-                        if (File.Exists($"{ReportFolder}{ReportPrefix}_{DateTime.Now.AddMonths(-1):Y}{ReportExtension}")) {
-                            using (var packageLastMonth = new ExcelPackage($"{ReportFolder}{ReportPrefix}_{DateTime.Now.AddMonths(-1):Y}{ReportExtension}")) {
+                        if (File.Exists($"{reportFolder}{reportPrefix}_{DateTime.Now.AddMonths(-1):Y}{reportExtension}")) {
+                            using (var packageLastMonth = new ExcelPackage($"{reportFolder}{reportPrefix}_{DateTime.Now.AddMonths(-1):Y}{reportExtension}")) {
                                 int y = 2;
                                 worksheets = packageLastMonth.Workbook.Worksheets.OrderBy(w => w.Name).ToList();
                                 // Get last month last day value in BTC
@@ -355,7 +357,7 @@ namespace Spot_Wallets_Report_Generator {
 
                     // Wallet evolution
                     if (lastDay != null) {
-                        if (UseBTCEvol) {
+                        if (useBTCEvol) {
                             try {
                                 ExcelLineChart lineChart = sheet.Drawings.AddLineChart($"Evolution in BTC {DateTime.Now:yyyyMMdd}", eLineChartType.Line);
                                 lineChart.Title.Text = "Evolution in BTC";
@@ -379,7 +381,7 @@ namespace Spot_Wallets_Report_Generator {
                             }
                         }
 
-                        if (UseUSDTEvol) {
+                        if (useUSDTEvol) {
                             try {
                                 ExcelLineChart lineChartUSDT = sheet.Drawings.AddLineChart($"Evolution in USDT {DateTime.Now:yyyyMMdd}", eLineChartType.Line);
                                 lineChartUSDT.Title.Text = "Evolution in USDT";
@@ -500,9 +502,23 @@ namespace Spot_Wallets_Report_Generator {
         }
 
         public static bool ConsoleCtrlCheck(CtrlTypes ctrlType) {
-            if (ctrlType == CtrlTypes.CTRL_CLOSE_EVENT && !log.IsWritten)
-                File.Delete(log.LogName);
+            if (openLog&&log.HasException) {// && log.HasException || error
+                try {
+                    Process.Start(new FileInfo(log.LogName).FullName);
+                }
+                catch(Exception e) {
+                    WriteLog($"Exception when trying to open log.",e.Message+e.StackTrace);
+                }
+            }
+            if (openReport) {
+                try {
+                    Process.Start($"{reportFolder}{reportPrefix}_{DateTime.Now:Y}{reportExtension}");
+                }
+                catch (Exception e) {
+                    WriteLog($"Exception when trying to open report.", e.Message + e.StackTrace);
+                }              
+            }
             return true;
-        }
+        }       
     }
 }

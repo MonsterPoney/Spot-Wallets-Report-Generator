@@ -151,6 +151,7 @@ namespace Spot_Wallets_Report_Generator.APIcalls {
                 } else {
                     dynamic json = Json.Decode(response.Content.ReadAsStringAsync().Result);
                     Program.WriteLog($"Error BinanceCalls.GetWallet() => error code : {json.code}\r\nMessage : {json.msg}\r\n");
+                    Program.error = true;
                 }
 
             }
@@ -175,8 +176,10 @@ namespace Spot_Wallets_Report_Generator.APIcalls {
                         Environment.Exit(1);
                     } else {
                         dynamic json = Json.Decode(response.Content.ReadAsStringAsync().Result);
-                        if (json.code != -1121)
+                        if (json.code != -1121) {
                             Program.WriteLog($"Error Binance.GetAveragePrice({symbol}) => error code : {json.code}\r\nMessage : {json.msg}");
+                            Program.error = true;
+                        }
                     }
                 }
 

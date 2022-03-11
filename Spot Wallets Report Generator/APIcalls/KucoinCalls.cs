@@ -169,6 +169,7 @@ namespace Spot_Wallets_Report_Generator.APIcalls {
                 } else {
                     dynamic json = Json.Decode(response.Content.ReadAsStringAsync().Result);
                     Program.WriteLog($"Error KucoinCalls.GetAveragePrice({symbol}) => code {json.code} : {json.data}");
+                    Program.error = true;
                 }
             }
             catch (Exception e) {
