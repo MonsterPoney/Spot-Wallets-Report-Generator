@@ -22,12 +22,12 @@ namespace Spot_Wallets_Report_Generator {
     internal class Program {
         public static Logger log;
 
-        public static bool initialInsert = false, error=false;
+        public static bool initialInsert = false, error = false;
         public static readonly ConfigFile ini = new ConfigFile($"{Environment.CurrentDirectory}/config.ini");
         private static string reportFolder, reportPrefix, sortBy, reportExtension;
         private static float ignoreUnder;
         public static string dbPath;
-        private static bool useDB, useBTCEvol, useUSDTEvol, openLog=false, openReport=false, autoTimeSync;
+        private static bool useDB, useBTCEvol, useUSDTEvol, openLog = false, openReport = false, autoTimeSync;
         private static List<Balance> dailyDatas;
 
         [DllImport("user32.dll")]
@@ -38,10 +38,10 @@ namespace Spot_Wallets_Report_Generator {
 
         private const int SW_HIDE = 0;
         static void Main(string[] args) {
-            try {               
+            try {
                 log = new Logger("./", "", true);
                 SetConsoleCtrlHandler(new HandlerRoutine(ConsoleCtrlCheck), true);
-                
+
                 // Get arguments
                 try {
                     string Arguments = ini.ReadKey("Options", "Arguments").ToLower();
@@ -56,6 +56,7 @@ namespace Spot_Wallets_Report_Generator {
                     }
                     // Apply arguments
                     for (int i = 0; i < args.Length; i++) {
+                        WriteLog($"Argument {args[i]}");
                         if (args[i] == "-nc" || args[i] == "--noconsole") {
                             var hwnd = GetConsoleWindow();
                             ShowWindow(hwnd, SW_HIDE);
@@ -91,7 +92,7 @@ namespace Spot_Wallets_Report_Generator {
                         Console.ReadKey();
                     }
                     Environment.Exit(1);
-                }            
+                }
             }
 
             // Exception if null for booleans
@@ -116,7 +117,7 @@ namespace Spot_Wallets_Report_Generator {
                 dailyDatas = new List<Balance>();
                 if (bool.TryParse(ini.ReadKey("API", "UseBinance").ToLower(), out bool useBinance) == true) {
                     if (useBinance) {
-                        
+
                         WriteLog("Get Binance spot wallet.");
                         dailyDatas.AddRange(BinanceCalls.GetWallet());
                         /*
@@ -333,12 +334,12 @@ namespace Spot_Wallets_Report_Generator {
                     sheet.Cells["A" + (i + 1)].Value = "Total";
                     sheet.Cells["H" + (i + 1)].Formula = $"SUM(H2:H{i})";
                     sheet.Cells["I" + (i + 1)].Formula = $"SUM(I2:I{i})";
-                    sheet.Cells["A1:K" + (i+1)].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
-                    sheet.Cells["A1:K" + (i+1)].AutoFitColumns();
+                    sheet.Cells["A1:K" + (i + 1)].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+                    sheet.Cells["A1:K" + (i + 1)].AutoFitColumns();
                     sheet.Calculate();
                     sheet.ClearFormulas();
 
-                    var table = sheet.Tables.Add(sheet.Cells["A1:K" + (i+1)], $"DayTable_{DateTime.Now:yyyyMMdd}");
+                    var table = sheet.Tables.Add(sheet.Cells["A1:K" + (i + 1)], $"DayTable_{DateTime.Now:yyyyMMdd}");
                     table.TableStyle = OfficeOpenXml.Table.TableStyles.Light1;
 
                     try {
@@ -369,7 +370,7 @@ namespace Spot_Wallets_Report_Generator {
                                     sheet.Cells["R" + (x + 1)].Value = float.Parse(previousTotal[x].Value.Split('|')[0]);
                                 }
                                 // Date format
-                                sheet.Cells["Q" + (previousTotal.Count + 1)].Value = DateTime.ParseExact(sheet.Name,"yyyyMMdd",null).ToString("yyyy/MM/dd");
+                                sheet.Cells["Q" + (previousTotal.Count + 1)].Value = DateTime.ParseExact(sheet.Name, "yyyyMMdd", null).ToString("yyyy/MM/dd");
                                 sheet.Cells["Q1:Q" + (previousTotal.Count + 1)].Style.Numberformat.Format = "0";
                                 sheet.Cells["R" + (previousTotal.Count + 1)].Value = sheet.Cells["H" + (i + 1)].Value;
                                 sheet.Cells["R1:R" + (previousTotal.Count + 1)].Style.Numberformat.Format = "#,##0.000000";
@@ -502,12 +503,12 @@ namespace Spot_Wallets_Report_Generator {
         }
 
         public static bool ConsoleCtrlCheck(CtrlTypes ctrlType) {
-            if (openLog&&log.HasException) {// && log.HasException || error
+            if (openLog && (log.HasException || error)) {
                 try {
                     Process.Start(new FileInfo(log.LogName).FullName);
                 }
-                catch(Exception e) {
-                    WriteLog($"Exception when trying to open log.",e.Message+e.StackTrace);
+                catch (Exception e) {
+                    WriteLog($"Exception when trying to open log.", e.Message + e.StackTrace);
                 }
             }
             if (openReport) {
@@ -516,9 +517,9 @@ namespace Spot_Wallets_Report_Generator {
                 }
                 catch (Exception e) {
                     WriteLog($"Exception when trying to open report.", e.Message + e.StackTrace);
-                }              
+                }
             }
             return true;
-        }       
+        }
     }
 }
