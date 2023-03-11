@@ -149,9 +149,11 @@ namespace Spot_Wallets_Report_Generator.APIcalls {
                         }
                     }
                 } else {
-                    dynamic json = Json.Decode(response.Content.ReadAsStringAsync().Result);
-                    Program.WriteLog($"Error BinanceCalls.GetWallet() => error code : {json.code}\r\nMessage : {json.msg}\r\n");
+                    dynamic json = Json.Decode(response.Content.ReadAsStringAsync().Result);                   
+                    Program.WriteLog($"Error BinanceCalls.GetWallet() => error code : {json.code}\r\nMessage : {json.msg}");
                     Program.error = true;
+                    if (json.code == -1021 && Program.stopIfBadTimeStamp)
+                        Environment.Exit(1398);                    
                 }
 
             }
@@ -173,7 +175,7 @@ namespace Spot_Wallets_Report_Generator.APIcalls {
                         price = float.Parse(json.price.Replace('.', ','));
                     } else if ((int)response.StatusCode == 429) {
                         Program.WriteLog("Breaking Binance API rate limit.");
-                        Environment.Exit(1);
+                        Environment.Exit(58);
                     } else {
                         dynamic json = Json.Decode(response.Content.ReadAsStringAsync().Result);
                         if (json.code != -1121) {

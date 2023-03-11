@@ -59,8 +59,9 @@
     <Reference Include="System.Numerics" />
     <Reference Include="System.Security" />
     <Reference Include="System.Threading.Tasks" />
-    <Reference Include="System.Web.Helpers">
-      <HintPath>C:\Users\WolfyX\Desktop\BinanceSync v2.0.0.0\packages\Microsoft.AspNet.WebPages.3.2.7\lib\net45\System.Web.Helpers.dll</HintPath>
+    <Reference Include="System.Web.Helpers, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\System.Web.Helpers.dll</HintPath>
     </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />

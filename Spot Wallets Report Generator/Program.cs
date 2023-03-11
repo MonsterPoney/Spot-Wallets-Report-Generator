@@ -11,24 +11,26 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Management.Automation;
-using System.Reflection;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using LicenseContext = OfficeOpenXml.LicenseContext;
 
 namespace Spot_Wallets_Report_Generator {
-
+    // https://learn.microsoft.com/en-us/windows/win32/debug/system-error-codes
     internal class Program {
         public static Logger log;
 
-        public static bool initialInsert = false, error = false;
+        public static bool initialInsert = false, error = false, stopIfBadTimeStamp;
         public static readonly ConfigFile ini = new ConfigFile($"{Environment.CurrentDirectory}/config.ini");
         private static string reportFolder, reportPrefix, sortBy, reportExtension;
         private static float ignoreUnder;
+        private static List<string> ignoredAsset;
         public static string dbPath;
         private static bool useDB, useBTCEvol, useUSDTEvol, openLog = false, openReport = false, autoTimeSync;
         private static List<Balance> dailyDatas;
+        private static ExcelPackage package;
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
@@ -80,29 +82,32 @@ namespace Spot_Wallets_Report_Generator {
                 dbPath = ini.ReadKey("Options", "DatabasePath");
                 sortBy = ini.ReadKey("Options", "SortBy").ToLower();
                 reportExtension = ini.ReadKey("Options", "ReportExtension");
+                stopIfBadTimeStamp = bool.Parse(ini.ReadKey("Options", "StopIfBadTimestamp").ToLower());
                 if (!reportExtension.StartsWith("."))
                     reportExtension = "." + reportExtension;
                 if (!string.IsNullOrWhiteSpace(ini.ReadKey("Options", "IgnoreUnder")) && !float.TryParse(ini.ReadKey("Options", "IgnoreUnder").Replace('.', ','), out ignoreUnder))
                     WriteLog($"Synthax error with parameter 'IngoreUnder', value: { ini.ReadKey("Options", "IgnoreUnder")}\r\nMake sure to use only digits with an optional decimal separator like '.' or ','\r\n Ignored parameter.");
-
-                if (reportFolder == null || reportPrefix == null || (dbPath == null && useDB == true)) {
+                ignoredAsset = ini.ReadKey("Options", "IgnoreAsset").ToUpper().Split(',').ToList();
+                if (ignoredAsset.Count > 0)
+                    ignoredAsset.ForEach(it => WriteLog($"Asset {it} ignored in report."));
+                if (string.IsNullOrWhiteSpace(reportFolder) || string.IsNullOrWhiteSpace(reportPrefix) || (string.IsNullOrWhiteSpace(dbPath) && useDB == true)) {
                     WriteLog("Incomplete configuration file.");
                     if (!args.Contains("-nc") || !args.Contains("--noconsole")) {
                         Console.WriteLine("Press Any key to exit.");
                         Console.ReadKey();
                     }
-                    Environment.Exit(1);
+                    Environment.Exit(1610);
                 }
             }
 
             // Exception if null for booleans
             catch (Exception e) {
-                WriteLog("Error with the configuration file : ", e.Message + e.StackTrace);
+                WriteLog("Error with the configuration file : ", e?.Message + e?.StackTrace);
                 if (!args.Contains("-nc") || !args.Contains("--noconsole")) {
                     Console.WriteLine("Press Any key to exit.");
                     Console.ReadKey();
                 }
-                Environment.Exit(1);
+                Environment.Exit(1610);
             }
             try {
                 // If user wants to use the local database
@@ -110,7 +115,7 @@ namespace Spot_Wallets_Report_Generator {
                     if (DB.VerifDB() == false) {
                         Console.WriteLine("Verification DB false");
                         Console.ReadKey();
-                        Environment.Exit(1);
+                        Environment.Exit(1065);
                     }
 
                 // Get wallets from APIs
@@ -119,19 +124,31 @@ namespace Spot_Wallets_Report_Generator {
                     if (useBinance) {
 
                         WriteLog("Get Binance spot wallet.");
+
+                        if (!CheckTimeStamp()) {
+                            if (autoTimeSync) {
+                                if (!IsRunAsAdmin()) {
+                                    var exeName = Process.GetCurrentProcess().MainModule.FileName;
+                                    var startInfo = new ProcessStartInfo(exeName);
+                                    startInfo.Verb = "runas";
+                                    Process.Start(startInfo);
+                                    Environment.Exit(1398);
+                                } else {
+                                    WriteLog("Sync System time");
+                                    SyncSystemTime();
+                                }
+                            } else {
+                                WriteLog("System time is 1000ms+ different from the Binance server time.");
+                                if (stopIfBadTimeStamp)
+                                    Environment.Exit(1398);
+                            }                       
+                        }
+
                         dailyDatas.AddRange(BinanceCalls.GetWallet());
-                        /*
-                        if (CheckTimeStamp())
-                            dailyDatas.AddRange(BinanceCalls.GetWallet());
-                        else if (AutoTimeSync)
-                            SyncSystemTime();
-                        else
-                            WriteLog("System time is 1000ms+ different from the Binance server time.");
-                        */
                     }
                 } else {
                     WriteLog("Error when reading the 'UseBinance' option");
-                    Environment.Exit(1);
+                    Environment.Exit(1610);
                 }
 
                 if (bool.TryParse(ini.ReadKey("API", "UseBybit").ToLower(), out bool useBybit) == true) {
@@ -141,7 +158,7 @@ namespace Spot_Wallets_Report_Generator {
                     }
                 } else {
                     WriteLog("Error when reading the 'UseBybit' option");
-                    Environment.Exit(1);
+                    Environment.Exit(1610);
                 }
 
                 if (bool.TryParse(ini.ReadKey("API", "UseKucoin").ToLower(), out bool useKucoin) == true) {
@@ -151,9 +168,10 @@ namespace Spot_Wallets_Report_Generator {
                     }
                 } else {
                     WriteLog("Error when reading the 'UseKucoin' option");
-                    Environment.Exit(1);
+                    Environment.Exit(1610);
                 }
 
+                dailyDatas.RemoveAll(d => ignoredAsset.Contains(d.Asset));
 
                 if (ignoreUnder != 0)
                     dailyDatas.RemoveAll(d => d.AvgInUSDT < ignoreUnder);
@@ -164,7 +182,7 @@ namespace Spot_Wallets_Report_Generator {
                         Console.WriteLine("Press Any key to exit.");
                         Console.ReadKey();
                     }
-                    Environment.Exit(0);
+                    Environment.Exit(259);
                 }
 
                 if (sortBy == "site") {
@@ -192,9 +210,11 @@ namespace Spot_Wallets_Report_Generator {
 
                 GenerateReport();
                 WriteLog("----End of execution----");
+                Environment.ExitCode=0;
             }
             catch (Exception e) {
                 WriteLog("Global exception : ", e.Message + e.StackTrace);
+                Environment.ExitCode=574;
             }
         }
 
@@ -204,7 +224,7 @@ namespace Spot_Wallets_Report_Generator {
                 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
                 bool newFile = File.Exists($"{reportFolder}{reportPrefix}_{DateTime.Now:Y}{reportExtension}") == false;
                 FileInfo file = new FileInfo($"{reportFolder}{reportPrefix}_{DateTime.Now:Y}{reportExtension}");
-                using (var package = new ExcelPackage(file)) {
+                using (package = new ExcelPackage(file)) {
 
                     List<ExcelWorksheet> worksheets = package.Workbook.Worksheets.OrderBy(w => w.Name).ToList();
                     List<KeyValuePair<string, string>> previousTotal = new List<KeyValuePair<string, string>>();
@@ -212,7 +232,7 @@ namespace Spot_Wallets_Report_Generator {
                     // Get last day asset and values for PNL
                     List<Balance> lastDayBalances = new List<Balance>();
                     var lastDay = worksheets.LastOrDefault();
-
+          
                     if (newFile) {
                         // Search for last month excel
                         if (File.Exists($"{reportFolder}{reportPrefix}_{DateTime.Now.AddMonths(-1):Y}{reportExtension}")) {
@@ -264,7 +284,7 @@ namespace Spot_Wallets_Report_Generator {
                         // Get last balances
                         if (lastDay != null) {
                             y = 2;
-                            // Use B column to avoid "Total" cell
+                            // Use B column to avoid "Total" line
                             while (lastDay.Cells["B" + y].Value != null) {
                                 lastDayBalances.Add(new Balance
                                 {
@@ -414,62 +434,86 @@ namespace Spot_Wallets_Report_Generator {
             }
         }
 
+        private static bool IsRunAsAdmin() {
+            WindowsIdentity identity = WindowsIdentity.GetCurrent();
+            WindowsPrincipal principal = new WindowsPrincipal(identity);
+            return principal.IsInRole(WindowsBuiltInRole.Administrator);
+        }
+
         private static void SyncSystemTime() {
             try {
-                string status = ExecPS("w32tm /query /status");
-                WindowsPrincipal principal = new WindowsPrincipal(WindowsIdentity.GetCurrent());
-                // If service not started
-                if (status.Contains("0x80070426")) {
-                    if (!principal.IsInRole(WindowsBuiltInRole.Administrator)) {
-                        // Ask to escalate admin privileges
-                        ProcessStartInfo processInfo = new ProcessStartInfo
-                        {
-                            Verb = "runas",
-                            FileName = Assembly.GetExecutingAssembly().Location
-                        };
+                //default Windows time server
+                const string ntpServer = "time.windows.com";
 
-                        try {
-                            // Relaunch the application with admin rights
-                            Process.Start(processInfo);
-                            Environment.Exit(0);
-                        }
-                        // Thrown if the user cancels the prompt
-                        catch (Win32Exception) {
-                            WriteLog("Please resync the system time and retry.");
-                            Environment.Exit(1);
-                        }
-                    } else {
-                        status = ExecPS("restart-service w32time");
-                    }
-                } else {
-                    // Indicateur de dérive : 0(Aucun avertissement) Indicateur de dérive : 3(Non synchronisé)
-                    if (!status.Split('\n')[0].Contains("0")) {
-                        if (principal.IsInRole(WindowsBuiltInRole.Administrator)) {
-                            status = ExecPS("w32tm /resync /force");
-                        } else {
-                            WriteLog("Please resync the system time and retry.");
-                        }
-                    }
+                // NTP message size - 16 bytes of the digest (RFC 2030)
+                var ntpData = new byte[48];
+
+                //Setting the Leap Indicator, Version Number and Mode values
+                ntpData[0] = 0x1B; //LI = 0 (no warning), VN = 3 (IPv4 only), Mode = 3 (Client Mode)
+
+                var addresses = Dns.GetHostEntry(ntpServer).AddressList;
+
+                //The UDP port number assigned to NTP is 123
+                var ipEndPoint = new IPEndPoint(addresses[0], 123);
+                //NTP uses UDP
+
+                using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)) {
+                    socket.Connect(ipEndPoint);
+
+                    //Stops code hang if NTP is blocked
+                    socket.ReceiveTimeout = 3000;
+
+                    socket.Send(ntpData);
+                    socket.Receive(ntpData);
+                    socket.Close();
+                }
+
+                //Offset to get to the "Transmit Timestamp" field (time at which the reply 
+                //departed the server for the client, in 64-bit timestamp format."
+                const byte serverReplyTime = 40;
+
+                //Get the seconds part
+                ulong intPart = BitConverter.ToUInt32(ntpData, serverReplyTime);
+
+                //Get the seconds fraction
+                ulong fractPart = BitConverter.ToUInt32(ntpData, serverReplyTime + 4);
+
+                //Convert From big-endian to little-endian
+                intPart = SwapEndianness(intPart);
+                fractPart = SwapEndianness(fractPart);
+
+                var milliseconds = (intPart * 1000) + ((fractPart * 1000) / 0x100000000L);
+
+
+                var dtDateTime = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                dtDateTime = dtDateTime.AddMilliseconds((long)milliseconds).ToLocalTime();
+
+                NativeMethods.SYSTEMTIME time = new NativeMethods.SYSTEMTIME
+                {
+                    wDay = (ushort)dtDateTime.Day,
+                    wMonth = (ushort)dtDateTime.Month,
+                    wYear = (ushort)dtDateTime.Year,
+                    wHour = (ushort)dtDateTime.Hour,
+                    wMinute = (ushort)dtDateTime.Minute,
+                    wSecond = (ushort)dtDateTime.Second,
+                    wMilliseconds = (ushort)dtDateTime.Millisecond
+                };
+
+                if (!NativeMethods.SetLocalTime(ref time)) {
+                    // The native function call failed, so throw an exception
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
                 }
             }
-            catch (Exception e) {
-                WriteLog("Exception SyncSystemTime()", e.Message + e.StackTrace);
+            catch (Exception ex) {
+                Console.WriteLine("Error : " + ex.Message);
             }
         }
 
-        private static string ExecPS(string script) {
-            string response = "";
-            try {
-                PowerShell powerShell = PowerShell.Create();
-                powerShell.AddScript(script);
-                foreach (var className in powerShell.Invoke()) {
-                    response += className;
-                }
-            }
-            catch (Exception e) {
-                Program.WriteLog($"Exception ExecPS(*)", e.Message + e.StackTrace);
-            }
-            return response;
+        static uint SwapEndianness(ulong x) {
+            return (uint)(((x & 0x000000ff) << 24) +
+                           ((x & 0x0000ff00) << 8) +
+                           ((x & 0x00ff0000) >> 8) +
+                           ((x & 0xff000000) >> 24));
         }
 
         /// <summary>
@@ -477,10 +521,10 @@ namespace Spot_Wallets_Report_Generator {
         /// </summary>
         /// <returns>True if delta < 1000ms </returns>
         private static bool CheckTimeStamp() => Math.Abs(BinanceCalls.GetServerTime() - long.Parse(CommonCalls.GetTimeStamp())) < 1000;
-
+       
         public static void WriteLog(string message, string exception = null) {
             Console.WriteLine(message);
-            log.WriteLog(message, exception);
+            log.WriteLog(message??"", exception);
         }
 
         // Declare the SetConsoleCtrlHandler function
@@ -503,6 +547,10 @@ namespace Spot_Wallets_Report_Generator {
         }
 
         public static bool ConsoleCtrlCheck(CtrlTypes ctrlType) {
+            if (package != null) {
+                package.Save();
+                package.Dispose();
+            }
             if (openLog && (log.HasException || error)) {
                 try {
                     Process.Start(new FileInfo(log.LogName).FullName);
@@ -520,6 +568,25 @@ namespace Spot_Wallets_Report_Generator {
                 }
             }
             return true;
+        }
+    }
+    static class NativeMethods {
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        internal static extern bool SetLocalTime(ref System.DateTime lpSystemTime);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        internal static extern bool SetLocalTime(ref SYSTEMTIME lpSystemTime);
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct SYSTEMTIME {
+            public ushort wYear;
+            public ushort wMonth;
+            public ushort wDayOfWeek;    // ignored for the SetLocalTime function
+            public ushort wDay;
+            public ushort wHour;
+            public ushort wMinute;
+            public ushort wSecond;
+            public ushort wMilliseconds;
         }
     }
 }

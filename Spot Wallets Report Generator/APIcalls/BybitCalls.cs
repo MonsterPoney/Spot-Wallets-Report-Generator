@@ -105,6 +105,8 @@ namespace Spot_Wallets_Report_Generator.APIcalls {
                         }
                     } else {
                         Program.WriteLog($"Error BybitCalls.GetWallet(), code {json.ret_code} : {json.ret_msg}");
+                        if (json.ret_code == -1021 && Program.stopIfBadTimeStamp)
+                            Environment.Exit(1398);
                         Program.error = true;
                     }
                 } else {

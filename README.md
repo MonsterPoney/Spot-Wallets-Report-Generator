@@ -23,7 +23,7 @@ Switch 'UseBinance' to true.
 
 ### Bybit
 Acquire Bybit API key in your profile > API
-In the "API key permissions" section, check "Read-Only" and check the permission "Trade"
+In the "API key permissions" section, check "Read-Only" and check the permission "Trade" for SPOT
 You can also restrict the access to one or multiple IPs.
 
 ![Bybit API config](https://user-images.githubusercontent.com/25821500/154150876-78eb9950-defe-4912-b8d1-c521002e5e96.JPG)
@@ -65,13 +65,25 @@ No data is sent on an external source, everything is on your computer in the pro
 - Error "database is locked"
 	This happen when a connection to the db file is already openned
 	
-- Error code -1021 "Timestamp for this request was 1000ms ahead of the server's time."
+- Error code 1398 or -1021 "Timestamp for this request was 1000ms ahead of the server's time."
 	Your system clock might be (at least slightly) off, try resync the system clock of your computer in the Date and time settings.
-	~~The program will attempt to do it if you set the 'AutoTimeSync' to 'true'.~~
+	The program will attempt to do it if you set the 'AutoTimeSync' to 'true'.
 
 - Error when reading the 'xxxx' option
 	If you build the source code, visual studio encode the config file with a Byte Of Mark (UTF-8-BOM).
 	Change the encoding to UTF-8 with notepad++ or other text editor.
+
+- Error code 1610
+	Check the config.ini file, there must be a missing parameter like a boolean.
+
+- Error code 1065
+	Error with the database, the log should give an explanation
+
+- Error code 259
+	No asset was recovered, make sure you use at least one API in the config file.
+
+- Error code 574
+	It's the global error, ( ._.) That's annoying but the log file should help.
 	
 ## Donations
 I developped this program on my spare time, if you want to support me you can donate at theses adresses :
